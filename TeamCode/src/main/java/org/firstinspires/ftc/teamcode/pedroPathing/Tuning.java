@@ -34,9 +34,10 @@ import java.util.List;
  * @author Baron Henderson - 20077 The Indubitables
  * @version 1.0, 6/26/2025
  */
+
 @Configurable
 @TeleOp(name = "Tuning", group = "Pedro Pathing")
-public class Tuning extends SelectableOpMode {
+public class Tuning extends OpMode { // CAMBIO 1: Extendemos OpMode directamente
     public static Follower follower;
 
     @IgnoreConfigurable
@@ -48,37 +49,12 @@ public class Tuning extends SelectableOpMode {
     @IgnoreConfigurable
     static ArrayList<String> changes = new ArrayList<>();
 
-    public Tuning() {
-        super("Select a Tuning OpMode", s -> {
-            s.folder("Localization", l -> {
-                l.add("Localization Test", LocalizationTest::new);
-                l.add("Forward Tuner", ForwardTuner::new);
-                l.add("Lateral Tuner", LateralTuner::new);
-                l.add("Turn Tuner", TurnTuner::new);
-            });
-            s.folder("Automatic", a -> {
-                a.add("Forward Velocity Tuner", ForwardVelocityTuner::new);
-                a.add("Lateral Velocity Tuner", LateralVelocityTuner::new);
-                a.add("Forward Zero Power Acceleration Tuner", ForwardZeroPowerAccelerationTuner::new);
-                a.add("Lateral Zero Power Acceleration Tuner", LateralZeroPowerAccelerationTuner::new);
-            });
-            s.folder("Manual", p -> {
-                p.add("Translational Tuner", TranslationalTuner::new);
-                p.add("Heading Tuner", HeadingTuner::new);
-                p.add("Drive Tuner", DriveTuner::new);
-                p.add("Line Tuner", Line::new);
-                p.add("Centripetal Tuner", CentripetalTuner::new);
-            });
-            s.folder("Tests", p -> {
-                p.add("Line", Line::new);
-                p.add("Triangle", Triangle::new);
-                p.add("Circle", Circle::new);
-            });
-        });
-    }
+    // Variable para guardar el test que queremos forzar
+    private OpMode targetOpMode;
 
     @Override
-    public void onSelect() {
+    public void init() {
+        // 1. Lógica de inicialización original (lo que estaba en onSelect)
         if (follower == null) {
             follower = Constants.createFollower(hardwareMap);
             PanelsConfigurables.INSTANCE.refreshClass(this);
@@ -87,17 +63,58 @@ public class Tuning extends SelectableOpMode {
         }
 
         follower.setStartingPose(new Pose());
-
         poseHistory = follower.getPoseHistory();
-
         telemetryM = PanelsTelemetry.INSTANCE.getTelemetry();
-
         Drawing.init();
+
+        // 2. FORZAR LOCALIZATION TEST
+        // Instanciamos directamente el test que quieres
+        targetOpMode = new LocalizationTest();
+
+        // 3. INYECCIÓN DE DEPENDENCIAS
+        // Es crucial pasarle el hardwareMap y telemetry al nuevo OpMode manualmente
+        targetOpMode.hardwareMap = hardwareMap;
+        targetOpMode.telemetry = telemetry;
+        targetOpMode.gamepad1 = gamepad1;
+        targetOpMode.gamepad2 = gamepad2;
+
+        // 4. Inicializar el test
+        targetOpMode.init();
     }
 
     @Override
-    public void onLog(List<String> lines) {}
+    public void init_loop() {
+        // Delegamos el bucle de init al test
+        if (targetOpMode != null) {
+            targetOpMode.init_loop();
+        }
+    }
 
+    @Override
+    public void start() {
+        // Delegamos el inicio
+        if (targetOpMode != null) {
+            targetOpMode.start();
+        }
+    }
+
+    @Override
+    public void loop() {
+        // Delegamos el bucle principal
+        if (targetOpMode != null) {
+            targetOpMode.loop();
+        }
+    }
+
+    @Override
+    public void stop() {
+        // Delegamos el stop
+        if (targetOpMode != null) {
+            targetOpMode.stop();
+        }
+    }
+
+    // Métodos estáticos de ayuda se mantienen igual
     public static void drawOnlyCurrent() {
         try {
             Drawing.drawRobot(follower.getPose());
@@ -111,11 +128,16 @@ public class Tuning extends SelectableOpMode {
         Drawing.drawDebug(follower);
     }
 
-    /** This creates a full stop of the robot by setting the drive motors to run at 0 power. */
     public static void stopRobot() {
         follower.startTeleopDrive(true);
         follower.setTeleOpDrive(0,0,0,true);
     }
+
+    // El metodo onSelect ya no es necesario porque lo pusimos en init(),
+    // pero lo dejamos vacío o lo borramos para evitar errores de compilación
+    // si alguna interfaz lo pidiera (aunque al extender OpMode ya no hace falta).
+    public void onSelect() {}
+    public void onLog(List<String> lines) {}
 }
 
 /**
@@ -1218,15 +1240,21 @@ class Circle extends OpMode {
  * @author Lazar - 19234
  * @version 1.1, 5/19/2025
  */
+/**
+ * This is the Drawing class. It handles the drawing of stuff on Panels Dashboard, like the robot.
+ *
+ * @author Lazar - 19234
+ * @version 1.1, 5/19/2025
+ */
 class Drawing {
     public static final double ROBOT_RADIUS = 9; // woah
     private static final FieldManager panelsField = PanelsField.INSTANCE.getField();
 
     private static final Style robotLook = new Style(
-            "", "#3F51B5", 0.75
+            "", "#3F51B5", 0.0
     );
     private static final Style historyLook = new Style(
-            "", "#4CAF50", 0.75
+            "", "#4CAF50", 0.0
     );
 
     /**
@@ -1238,7 +1266,7 @@ class Drawing {
 
     /**
      * This draws everything that will be used in the Follower's telemetryDebug() method. This takes
-     * a Follower as an input, so an instance of the DashbaordDrawingHandler class is not needed.
+     * a Follower as an input, so an instance of the DashboardDrawingHandler class is not needed.
      *
      * @param follower Pedro Follower instance.
      */
